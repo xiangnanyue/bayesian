@@ -1,0 +1,597 @@
+---
+title: ' LAB 1- Bayesian learning: Answers '
+author: "Anne Sabourin "
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+  header-includes: \usepackage[french]{babel} 
+  pdf_document:
+    number_sections: yes
+    toc: yes
+---
+
+
+
+#  Part 1. tutorial 
+
+#  Part 2 : empirical bayes and Bayesian linear regression 
+
+**FUNCTIONS **
+
+
+```{r}
+glinear_fit <- function(Alpha, Beta, data, feature_map, target)
+    #' Alpha: prior precision on theta
+    #' Beta: noise precision
+    #' data: the input variables (x): a matrix with n rows where n is the sample size
+    #'feature_map: the basis function, returning a vector of  size p equal to the dimension of theta
+    #' target: the observed values y: a vector of size n 
+{
+    
+    Phi <-  t(apply(X= data, MARGIN=1, FUN = feature_map))
+    p = ncol(Phi)
+    posterior_variance_inverse <-  diag(x=Alpha, nrow= p) +
+        Beta * t(Phi)%*%Phi
+    posterior_variance <-  solve(posterior_variance_inverse)
+    posterior_mean <-   Beta *
+        posterior_variance %*% t(Phi)%*% target
+    return(list(mean=posterior_mean, cov=posterior_variance))
+}
+
+##' predictive distribution 
+glinear_pred <- function(Alpha, Beta, fitted, data, feature_map)
+    ## Alpha: prior pecision for theta
+    ## Beta: noise variance
+    ## fitted: the outputof glinear_fit: the posterior mean and
+#### variance of the parameter theta.
+    ## data: new input data where the predictive distribution 
+#### of Y must be computed  
+    ## feature map: the vector of basis functions 
+{
+    Phi_transpose <-  apply(X= data, MARGIN=1, FUN = feature_map)
+    pred_mean <- t(fitted$mean)%*% Phi_transpose
+    pred_variance <- Beta^(-1) +
+        apply(Phi_transpose, 2,
+              function(x){t(x)%*%fitted$cov%*%x})
+    return(list(mean = pred_mean, variance = pred_variance))
+    
+}
+
+
+##' feature map
+Fmap <- function(x){c(1, x,x^2,x^3, x^4)}
+
+
+##' Empirical bayes / model selection: computation of the log-evidence. 
+
+logevidence <- function(Alpha, Beta, data ,feature_map, target)
+    ## Alpha: prior precision for theta
+    ## Beta: noise precision
+    ## data: the input points x_{1:n}
+    ## feature_map: the vector of basis functions
+    ## target: the observed values y: a vector of size n.  
+{
+    Phi_transpose <-  apply(X= data, MARGIN=1, FUN = feature_map)
+    if(is.vector(Phi_transpose)){
+        Phi_transpose = matrix(Phi_transpose,nrow=1)
+    }
+    Phi <- t(Phi_transpose)
+    N <- nrow(Phi)
+    p <- ncol(Phi)
+    A <- Alpha*diag(p) + Beta * Phi_transpose %*% Phi
+    postmean <- Beta * solve(A) %*% Phi_transpose %*% target
+    energy <- Beta/2 * sum(( target - Phi%*%postmean)^2) + Alpha/2 * sum((postmean)^2)
+    res <- p/2 * log(Alpha) + N/2 * log(Beta) - energy - 1/2 * log(det(A)) - N/2 * log(2*pi)
+    return(res)    
+}
+
+logevidence2 <- function(Alpha, Beta, data ,feature_map, target)
+{
+    Phi_transpose <-  apply(X= data, MARGIN=1, FUN = feature_map)
+    if(is.vector(Phi_transpose)){
+        Phi_transpose = matrix(Phi_transpose,nrow=1)
+    }
+    target <- matrix(target, ncol=1)
+    Phi <- t(Phi_transpose)
+    N <- nrow(Phi)
+    p <- ncol(Phi)
+    Sigma <- Beta^{-1}*diag(N) + Alpha^{-1} * Phi %*% Phi_transpose
+##    postmean <- Beta * solve(A) %*% Phi_transpose %*% target
+##    energy <- Beta/2 * sum(( target - Phi%*%postmean)^2) + Alpha/2 * sum((postmean)^2)
+    res <- -1/2 * (log(det(Sigma))  + N/2 * log(2*pi) + t(target)%*%solve(Sigma)%*%target )
+    return(res)    
+}
+
+```
+
+## Posterior distribution in the linear model 
+###  Generating data in the model 
+
+```{r}
+Beta0 <- 0.1
+theta0 <- c(5, 2,1,-1,-0.1)
+h0 <- function(x){ sum(Fmap(x)* theta0)}
+N <- 100
+set.seed(3) 
+#'  allows result reproductibility  (sets the seed of the random number generator)
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+#' plotting the  training data and the true regression function
+absc = seq(-3, 3, length.out = 200)
+targetline = sapply(absc, h0)
+plot(absc, targetline, type='l', lwd=2, ##xaxt='n', yaxt='n',
+     xlab = "x", ylab="y", cex.lab=1.8, ylim= range(targetline, target))
+points(data, target, pch=19, col='red')
+```
+
+
+###  Fitting the model and plotting the output 
+
+Fitting the model for different vaues of $N$ and plotting the output compared with the true $\theta_0$.
+```{r}
+Alpha <- 0.01
+Beta <- Beta0
+Nmax <- 5000
+DATA <- runif(Nmax, min=-3, max = 3)
+TARGET <-  sapply(DATA,h0) + rnorm(Nmax, sd = sqrt(Beta0)^(-1))
+
+for (N in c(10, 50,200, 1000)){
+data <- matrix(DATA[1:N], ncol=1)
+target<- matrix(TARGET[1:N], ncol=1)
+mfit <- glinear_fit(Alpha = Alpha, Beta = Beta,
+                    data= data, feature_map = Fmap, target = target)
+Iplus <- mfit$mean + 1.96*sqrt(diag(mfit$cov))
+Iminus <- mfit$mean - + 1.96*sqrt(diag(mfit$cov))
+plot(theta0, pch=19,col='black',main = paste(" N = ", toString(N), sep=""), ylim = range(Iminus, Iplus, theta0))
+points(mfit$mean, col='red')
+arrows( x0 = 1:5, y0 = Iminus, 
+       y1 = Iplus ,code=3, length=0.1, col="red")
+
+}
+```
+
+###  Asymptotics: estimators as functions of the sample size n 
+```{r}
+N <- 10000
+set.seed(3)
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+Beta <- Beta0 ## noise precision in the model
+Alpha <-10  ## prior precision on theta
+
+ni=50
+inds = floor(seq(2,N,length.out=ni))
+MMean <- matrix(nrow=ni, ncol=5)
+Mstdev <- matrix(nrow=ni, ncol=5)
+
+for(i in 1:ni){
+    mfit <- glinear_fit(Alpha = Alpha, Beta = Beta,
+                        data= matrix(data[1:inds[i],],ncol=1),
+                        feature_map = Fmap,
+                        target = target[1:inds[i]])
+    MMean[i,] <- mfit$mean
+    Mstdev[i,] <- sqrt(diag(mfit$cov))
+}
+
+
+for(i in 1:5)
+{
+    credsup <- MMean[,i] + 1.96*Mstdev[,i]
+    credinf <- MMean[,i] - 1.96*Mstdev[,i]
+    plot(inds, MMean[,i], ylim=range(credsup,credinf) ,main = paste("theta[", toString(i), "]", sep=""))
+    lines(inds, credsup,col='red')
+    lines(inds, credinf,col='red')
+    abline(h=theta0[i])
+    }
+         
+```
+
+##  predictive distribution
+
+### Definition and expression in the linear model: 
+Considering the couple $(Y_{new}, \boldsymbol{ \theta})$, the posterior predictive distribution for $Y_{new}$ is the marginal distribution of $Y_{new}$ obtained by integrating out $\theta$ with respect to the posterior distribution.  Here, 
+$$ Y = \langle \Phi(x_{new}), \boldsymbol{\theta}\rangle + \epsilon $$
+with $\boldsymbol{\theta}\sim \boldsymbol{\pi}(\,\dot\,|y_1,\ldots,y_n) = \mathcal{N}(m_n, S_n)$. 
+Using the fact that $\epsilon$ and $\boldsymbol{\theta}$ are independent we obtain 
+\[
+\mathcal(Y_{\text{new}}| y_1,\ldots,y_n) = \mathcal{N}(\langle \Phi(x_{new}), m_n\rangle , \sigma_{new}^2= \phi(x_{new})^\top S_n \phi(x_{new}) + \beta^{-1})
+\]
+
+
+### Function glinear_pred : see code above
+
+### Plotting the preditive on a grid  
+```{r}
+
+## generate training data
+Beta0 <- 1
+theta0 <- c(5, 2,1,-1,-0.1)
+h0 <- function(x){ sum(Fmap(x)* theta0)}
+N <- 100
+set.seed(3)
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+## fit
+mfit <- glinear_fit(Alpha = Alpha, Beta = Beta,
+                    data= data, feature_map = Fmap, target = target)
+
+
+set.seed(2)
+#### generate test data
+Ntest = 60
+testData <- matrix(seq(-3,3, length.out=Ntest),ncol=1)
+testTarget <- sapply(testData, h0) + rnorm(Ntest, sd = sqrt(Beta0)^(-1))
+
+## predict
+
+mpred <- glinear_pred(Alpha = Alpha, Beta = Beta, fitted = mfit, data=testData, feature_map = Fmap)
+## plot the training data + target
+stdev = sqrt(mpred$variance)
+pred = mpred$mean
+yplus = pred +1.96*stdev
+yminus= pred - 1.96*stdev
+ymini = min(yminus)
+ymaxi = max(yplus)
+plot(x=testData, y=sapply(testData, h0), type='l', ylim=c(ymini,ymaxi))
+points(testData, testTarget, pch=18)
+lines(testData, mpred$mean, col="red")
+polygon(x = c(testData, rev(testData),
+              testData[1]),
+        y = c(yplus,rev(yminus), yplus[1]), col=rgb(1, 0, 0,0.5))
+points(data, target, pch=19, cex=1.2,col='blue')
+
+```
+
+***Additional remark: what happens if the data does not come from the linear model? ***
+
+Taking as  the true regression function a sinusoidal function and misspecifying $\beta$  is not so problematic as shown below: 
+
+```{r} 
+## generate training data and fit the model
+Beta0 <- 1
+Beta <- 2
+Alpha <-10  ## prior precision on theta
+h0 <- function(x){sin(x)}
+N <- 100
+set.seed(3)
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+## fit
+mfit <- glinear_fit(Alpha = Alpha, Beta = Beta,
+                    data= data, feature_map = Fmap, target = target)
+
+
+### generate test data
+Ntest = 60
+set.seed(2)
+testData <- matrix(seq(-3,3, length.out=60),ncol=1)
+testTarget <- sin(testData) + rnorm(Ntest, sd = sqrt(Beta0)^(-1))
+## predict 
+mpred <- glinear_pred(Alpha = Alpha, Beta = Beta, fitted = mfit, data=testData, feature_map = Fmap)
+## plot the training data + target
+stdev = sqrt(mpred$variance)
+pred = mpred$mean
+yplus = pred +1.96*stdev
+yminus= pred - 1.96*stdev
+ymini = min(yminus)
+ymaxi = max(yplus)
+plot(x=testData, y=sin(testData), type='l', ylim=c(ymini,ymaxi))
+points(testData, testTarget, pch=18)
+lines(testData, mpred$mean, col="red")
+polygon(x = c(testData, rev(testData),
+              testData[1]),
+        y = c(yplus,rev(yminus), yplus[1]), col=rgb(1, 0, 0,0.5))
+points(data, target, pch=19, cex=1.2,col='blue')
+
+```
+
+## Empirical Bayes
+
+### Expression for the log-evidence: homework
+### Alternative expression for the log-evidence: homework
+### Function 'logevidence': see code above. 
+
+### Empirical bayes for Alpha (visually)
+```{r}
+ALPHA <- seq(0.5, 200,by=0.5)##exp(seq(-5,5,by=0.2))
+Beta <- 5 ## 
+N <- 20
+##set.seed(3)
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+Beta0 <- 5 ## true Beta
+##target <-  sin(data) + rnorm(N, sd = sqrt(Beta0)^(-1))
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+logevid_Alpha <- sapply(ALPHA,FUN=function(a){
+    logevidence(Alpha=a, Beta, data ,feature_map=Fmap, target)})
+plot(ALPHA, logevid_Alpha)
+ALPHA[which.max(logevid_Alpha)]
+
+```
+### Empirical bayes for Beta (visually)
+```{r}
+BETA <- seq(0.1, 15,by=0.05)##exp(seq(-5,5,by=0.2))
+Alpha <- 0.03 ## result  quite robust to a modification of alpha
+N <- 20
+##set.seed(3)
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+Beta0 <- 5 ## true Beta
+##target <-  sin(data) + rnorm(N, sd = sqrt(Beta0)^(-1))
+target <-  sapply(data, h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+logevid_Beta <- sapply(BETA,FUN=function(b){
+    logevidence(Alpha, Beta=b, data ,feature_map=Fmap, target)})
+plot(BETA, logevid_Beta)
+BETA[which.max(logevid_Beta)]
+Beta0
+## good !
+```
+
+
+** Additional question: joint optimisation on Alpha, Beta**
+```{r}
+N <- 200
+##set.seed(3)5
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+Beta0 <- 5 ## true Beta
+##target <-  sin(data) + rnorm(N, sd = sqrt(Beta0)^(-1))
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+optAB <- optim(par=c(1, 1),
+      fn=function(par){-logevidence(Alpha=par[1], Beta=par[2], data ,feature_map=Fmap, target)},
+      method = "L-BFGS-B",
+      lower=c(0.1 , 0.1), upper = c(250,30))
+optAB
+
+optAB$par ## the two optimized parameters alpha and beta. 
+## looks good :)
+```
+
+
+
+### model choice: polynomial order. 
+```{r}
+F7<- function(x){c(1, x, x^2, x^3, x^4,x^5, x^6, x^7)}
+F6 <- function(x){c(1, x, x^2, x^3, x^4,x^5, x^6)}
+F5 <- function(x){c(1, x, x^2, x^3, x^4,x^5)}
+F4 <- function(x){c(1, x, x^2, x^3, x^4)}
+F3 <- function(x){c(1, x, x^2, x^3)}
+F2 <- function(x){c(1, x, x^2)}
+F1 <- function(x){c(1, x)}
+F0 <- function(x){1}
+listF=list(F0,F1,F2,F3,F4,F5,F6,F7)
+
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+Beta0 <- 5 ## true Beta
+#target <-  sin(data) + rnorm(N, sd = sqrt(Beta0)^(-1))
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+
+logevid_p <- sapply(0:7,FUN=function(i){
+    logevidence(Alpha=10, Beta=Beta0, data ,feature_map=listF[[i+1]], target)})
+plot(0:7, logevid_p)
+which.max(logevid_p)
+## 4  !!
+```
+
+### model choice:  joint optimisation over p, $\alpha$ and $\beta$. 
+```{r}
+N <- 200
+data <- matrix(runif(N, min=-3, max = 3),ncol=1)
+Beta0 <- 5 ## true Beta
+target <-  sapply(data,h0) + rnorm(N, sd = sqrt(Beta0)^(-1))
+##target <-  sin(data) + rnorm(N, sd = sqrt(Beta0)^(-1))
+Alphastars <- rep(0,8)
+Betastars <- rep(0,8)
+values <- rep(0,8)
+for(i in 1:8){
+optAB <- optim(par=c(1, 1),
+      fn=function(par){-logevidence(Alpha=par[1], Beta=par[2], data ,feature_map=listF[[i]], target)},
+      method = "L-BFGS-B",
+      lower=c(0.1 , 0.1), upper = c(300,50))
+Alphastars[i] <- optAB$par[1]
+Betastars[i] <- optAB$par[2]
+values[i] <- - optAB$value
+}
+
+plot(values)
+istar <- which.max(values)
+print("best polynomial order")
+istar -1 ## p
+print("best Alpha")
+Alphastars[istar]
+print("best Beta")
+Betastars[istar]
+```
+<!--
+#' #############-------------------------------####################################
+#' #################################################
+#' ##### part 2; naive bayes
+#' #################################################
+#' 
+#' ##install.packages("e1071")
+#' 
+#' library(e1071)
+#' 
+#'   
+#' ##install.packages('RCurl')
+#' library(RCurl)
+#' ## specify the URL for the adult data CSV
+#' urlfile <- 'https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
+#'  
+#'     
+#' # download the file
+#' downloaded <- getURL(urlfile, ssl.verifypeer=FALSE)
+#' # treat the text data as a steam so we can read from it
+#' connection <- textConnection(downloaded)
+#' # parse the downloaded data as CSV
+#' dataset <- read.csv(connection, header=FALSE, as.is=FALSE)#TRUE)
+#' # preview the first 5 rows
+#' head(dataset)
+#' 
+#' 
+#' adult <- dataset
+#' 
+#' #' inspect the dataset. Be careful: some columns are converted  factors. It's OK. (see help(factor)). Those columns correspond to categorical variabels.  If you really want to prevent this (not advisable) use 'as.is = TRUE' in the call to read.csv. 
+#' head(adult)
+#' ## which columns are factors ? (thus, categorical ?)
+#' indx <- sapply(adult, is.factor)
+#' Lev <- lapply(adult[indx], function(x) levels(x))
+#' Lev
+#' ## a list which i'th element is the vector of categories (stored as strings)  for the i'th categorical variable.
+#' 
+#' 
+#' ####adult[indx] <- lapply(adult[indx], function(x) as.numeric(as.character(x)))
+#' ##adult[indx] <- lapply(adult[indx], function(x) as.character(x))
+#' 
+#' #' the predicted variable is V15: income >50K or income <=50K
+#' 
+#' #' number of instances from each class
+#' length(which(adult[,15] ==Lev$V15[1]))
+#' length(which(adult[,15] ==Lev$V15[2]))
+#' 
+#' 
+#' #' Create train and test data
+#' N = dim(adult)[1]
+#' p = dim(adult)[2] - 1
+#' ##  -1: ignores the target column, which is the last one.
+#' 
+#' ## create a training and testing set 
+#' Ntrain = floor(2*N/3)
+#' training = adult[1:Ntrain,]
+#' test = adult[(Ntrain+1):N,]
+#' 
+#' #' separate label and features
+#' Class = training[,p+1]
+#' Features = training[,1:p]
+#' 
+#' 
+#' #' Define class prior probability using training set
+#' Nclass = length(levels(Class))
+#' classPrior=rep(0,Nclass)
+#' for (i in 1:Nclass){
+#'     classPrior[i] = length(which(Class == levels(Class)[i]))/Ntrain
+#' }
+#' classPrior
+#' 
+#' 
+#' #' train the model
+#' 
+#' train_naivebayes <- function(Class, predictors, laplace = 1)
+#'     ## Class: vector of target classes for the classification problem (a factor) 
+#'     ## predictors: the features (x) of the training data
+#'     ## laplace: an integer(0 or 1): 1 for laplace regularization, i.e. for assigning an additional observation to each class (avoids zeros)
+#' {
+#'     Nclass = length(levels(Class))
+#'     p = dim(predictors)[2]
+#'     indClass=list()
+#'     ## select indices corresponding to each class k
+#'     for(k in 1:Nclass){
+#'         indClass[[k]]= which(Class==levels(Class)[k])
+#'     }
+#'     fitted=list()
+#'     for (j in 1:p){
+#'         if(is.factor(predictors[,j])){
+#'             ## fit a multinomial model:
+#'             ## store the estimated probability for a class given ##
+#'             ## a  predictor in a  matrix (nrows: number of levels,
+#'             ## ncol: number of classes)
+#'             nlev_j = length(levels(predictors[,j]))
+#'             fitted[[j]]=matrix( nrow= nlev_j, ncol=Nclass)
+#'         }
+#'         else{ ##fit a normal model: store estimated mean and variance
+#'             fitted[[j]]=matrix(0,nrow = 2, ncol = Nclass)
+#'         }
+#'         for(k in 1:Nclass){
+#'             X = predictors[indClass[[k]], j]
+#'             if( is.factor(X)){
+#'                 counts = as.data.frame(table(X))[,2]+laplace
+#'                 probs = counts/sum(counts)
+#'                 fitted[[j]][,k] = probs
+#'             }
+#'             else{
+#'                 fitted[[j]][,k] = c(mean(X), sd(X) )
+#'             }
+#'         }
+#'     }
+#'     return(fitted)
+#' }
+#' 
+#' 
+#' fitted_naive <- train_naivebayes(Class=Class, predictors = training[,-15],laplace=1)
+#' fitted_naive
+#' 
+#' predict_naivebayes <- function(model, xnew, classPrior = NULL,
+#'                                labels = NULL)
+#' {
+#'     ## model: the output of function train_naivebayes
+#'     ## xnew: the new input points (a matrix with as any rows
+#' #### as test data)
+#'     ## classPrior: the prior probabilitie of each class.
+#' #### if NULL, a uniform prior will be imposed.
+#'     ## labels: the target class labels. If NULL, the class labels
+#' #### contained in the 'model' agument will be used. 
+#' 
+#'     p <- ncol(xnew)
+#'     if(is.null(labels)){
+#'         nclass <- ncol(model[[1]])
+#'         labels <- as.character(1:nclass)
+#'     }
+#'     else{nclass<- length(labels)}
+#'     if(is.null(classPrior)){
+#'         classPrior <- rep(1/nclass, nclass)
+#'     }
+#'     ntest <- nrow(xnew)
+#'     posteriorProb<- matrix(0, nrow = ntest, ncol = nclass,)
+#'     for( k in 1:nclass){
+#'         marglikelihoods= matrix(1,nrow= ntest, ncol=p)
+#'         for(j in 1:p){
+#'             if(is.factor(xnew[,j])){
+#'                 inds <- sapply(xnew[,j],
+#'                               function(x){which(x == levels(x))})
+#'                 marglikelihoods[,j] <- (model[[j]])[inds, k]
+#'             }
+#'             else{
+#'                 marglikelihoods[,j] <-
+#'                     dnorm(xnew[,j],
+#'                           mean= model[[j]][1,k],
+#'                           sd= model[[j]][2,k])
+#'             }
+#'             
+#'         }
+#'         posteriorProb[,k] <- classPrior[k] *
+#'             exp(apply(log(marglikelihoods), 1, sum ))
+#'         
+#'     }
+#'     normalize = apply(posteriorProb,1,sum)
+#'     posteriorProb = posteriorProb/normalize
+#'     ## M/v: each row M[i,] is divided by v[i] 
+#'     return(posteriorProb)
+#' }
+#' 
+#' Pclass <-  predict_naivebayes(fitted_naive,xnew = test[,-15], classPrior = classPrior, labels = levels(Class))
+#' 
+#' mapClass = apply(Pclass, 1, which.max)
+#' 
+#' mapClass = factor(mapClass, labels=c(" <=50K", " >50K"))
+#' ##mapClass
+#' testClass=test[,15]
+#' table(mapClass,testClass)
+#' 
+#' 
+#' m <- naiveBayes(x = training[, 1:14], y=training[ , 15], laplace =1)
+#' predm <- predict(m, test, type ="class")
+#' probm <- predict(m, test, type ="raw")
+#' table(predm, testClass)
+#' 
+#' 
+#' table(predm,mapClass)
+#' which(predm !=mapClass)
+#' Pclass[286,]
+#' probm[286,]
+#' test[286,]
+#' 
+#' strange = test[which(predm !=mapClass), ]
+#' 
+#' myprob = predict_naivebayes(fitted_naive,xnew = strange[1:5,-15], classPrior = classPrior, labels = levels(Class))
+#' theirprob = predict(m, strange, type = "raw")
+#' myprob
+#' theirprob
+-->

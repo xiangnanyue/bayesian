@@ -1,0 +1,26 @@
+Homework 3 on OLAP and Visualization
+Dear students,
+
+
+
+Here is the third homework assignment on OLAP analytics and visualization. We expect you to do OLAP analytics using PostgreSQL and visualization using Jupiter Notebook. 
+
+https://www.dropbox.com/s/2f7twfjqtzy2x4s/Homework3.pdf?dl=0
+
+To complete this assignment, you may need to run SQL queries on your VM and transfer query output to your personal computer for additional analysis and visualization (using Python and Jupyter Notebook). There are two methods for transferring query output from your VM to your computer: 
+
+Save query output as a 'csv' file and SCP the file to your computer;
+A more advanced method is to use the Python - PostgreSQL interface. If you are interested in this option, the script is provided below:
+https://www.dropbox.com/s/k9zcugtzwutczkc/psycopg2Example.py?dl=0
+
+
+
+This assignment is due on Friday, November 17 at 11:59 pm. 
+
+Please start early. 
+
+
+
+Best regards,
+
+Yanlei

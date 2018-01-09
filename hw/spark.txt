@@ -1,0 +1,46 @@
+WEEK 8: Introduction to Spark for Scalable Analytics
+LECTURE
+
+https://www.dropbox.com/s/5c44mii3mtkoig0/Lec8_spark_analytics.pdf?dl=0
+
+LAB 1: Spark Tutorial
+
+https://www.dropbox.com/s/amfi2c6itzcpprk/Spark_tutorial_1.pdf?dl=0
+
+LAB 2: Data Visualization 
+
+Eduroam user and password for today:
+
+
+login : telecom711074-1191
+mot de passe : m4LExsYF
+
+Instructions to install anaconda:
+
+1. Download and install "Python 3.6 version" from https://www.anaconda.com/download
+2. Create the environment: conda create -c bioconda --name conda_py36 python=3.6 numpy scipy pandas jupyter matplotlib seaborn plotly cufflinks scikit-learn
+3. Follow the instructions, if any, from the command output.
+4. Activate the recently created environment.
+source activate conda_py36
+
+Instructions to get today lab material:
+
+wget "https://sbda2017storageaccount.blob.core.windows.net/labs/dblp_statistics.tar.gz?st=2017-11-07T08%3A19%3A00Z&se=2018-01-08T08%3A19%3A00Z&sp=rl&sv=2016-05-31&sr=b&sig=9OP39%2BWSAUxdfvL4w%2BGFneTJnLjCGiiARy9uNNvRG0A%3D" -O dblp_statistics.tar.gz
+tar -xzvf dblp_statistics.tar.gz
+cd dblp_statistics
+jupyter notebook
+
+HDInsight clusters for today:
+
+To connect via ssh:
+ssh sshuser@sbdalab1-ssh.azurehdinsight.net
+ssh sshuser@sbdalab2-ssh.azurehdinsight.net
+
+in both cases with password Fryer79#Jove
+
+To connect to the Ambari dashboard:
+https://sbdalab1.azurehdinsight.net
+https://sbdalab2.azurehdinsight.net
+
+in both cases with user admin and password Fryer79#Jove
+See above
